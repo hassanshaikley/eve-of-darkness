@@ -32,6 +32,12 @@
         </template>
       </el-table-column>
 
+      <el-table-column align="center" label="Options">
+        <template slot-scope="scope">
+          <el-button type="primary" @click="$router.push(`/clients/${scope.row.account_name}`)">Inspect</el-button>
+        </template>
+      </el-table-column>
+
     </el-table>
   </div>
 </template>

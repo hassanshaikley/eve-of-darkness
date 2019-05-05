@@ -11,6 +11,13 @@ defmodule EOD.Web.ClientContext do
   def get_client_by_account_name(name) do
     session_manager()
     |> SessionManager.client_by_account(name)
+    |> case do
+      {:ok, pid} ->
+        {:ok, %{account_name: name, pid: pid}}
+
+      {:error, error} ->
+        {:error, error}
+    end
   end
 
   def get_connected_clients(_) do

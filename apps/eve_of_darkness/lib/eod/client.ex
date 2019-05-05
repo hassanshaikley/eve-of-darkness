@@ -6,6 +6,7 @@ defmodule EOD.Client do
   """
   use GenServer
   alias EOD.Client
+  alias EOD.Socket.TCP
   require Logger
 
   defstruct tcp_socket: nil,
@@ -51,6 +52,23 @@ defmodule EOD.Client do
     GenServer.call(pid, {:share_test_transaction, self()})
   end
 
+  @doc """
+  For debugging purposes this attempts to attach a socket inspector to the
+  tcp game socket.  It will return `:ok` on success or `{:error, reasons}`
+  for an error.
+  """
+  def add_tcp_inspector(pid, inspector) do
+    GenServer.call(pid, {:add_tcp_inspector, inspector})
+  end
+
+  @doc """
+  Attempts to remove an inspector from the tcp game socket - this is an async
+  call and as such has no reply
+  """
+  def remove_tcp_inspector!(pid) do
+    GenServer.cast(pid, :remove_inspector!)
+  end
+
   # GenServer Callbacks
 
   def init(state) do
@@ -67,9 +85,27 @@ defmodule EOD.Client do
     {:noreply, state}
   end
 
+  def handle_cast(:remove_inspector!, state) do
+    %{tcp_socket: socket, tcp_listener: listen} = state
+    updated_socket = TCP.GameSocket.remove_inspector(socket)
+    EOD.Socket.Listener.update_socket(listen, updated_socket)
+    {:noreply, %{state | tcp_socket: updated_socket}}
+  end
+
   def handle_call({:share_test_transaction, pid}, _, state) do
     Ecto.Adapters.SQL.Sandbox.allow(EOD.Repo, pid, self())
     {:reply, :ok, state}
+  end
+
+  def handle_call({:add_tcp_inspector, inspector}, _, state) do
+    %{tcp_socket: socket, tcp_listener: listen} = state
+    with {:ok, inspected_socket} <- TCP.GameSocket.add_inspector(socket, inspector) do
+      EOD.Socket.Listener.update_socket(listen, inspected_socket)
+      {:reply, :ok, %{state | tcp_socket: inspected_socket}}
+    else
+      error ->
+        {:reply, error, state}
+    end
   end
 
   def handle_call(:get_state, _, state) do
